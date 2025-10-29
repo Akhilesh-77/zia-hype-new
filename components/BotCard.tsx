@@ -19,7 +19,7 @@ const BotCard: React.FC<BotCardProps> = ({ bot, onSelect, onEdit, onDelete }) =>
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
     const storyText = bot.storyIdea ? ` and Story Idea: ${bot.storyIdea}` : '';
-    const prompt = `I need a chatbot personality of 🔵${bot.name} who is ${bot.description} to Akhilesh${storyText}* now give me code prompt to aistudio.google.com`;
+    const prompt = `I need a chatbot personality of 🔵${bot.name} who is ${bot.description} to Akhilesh${storyText} now give me code prompt to aistudio.google.com`;
     navigator.clipboard.writeText(prompt);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);

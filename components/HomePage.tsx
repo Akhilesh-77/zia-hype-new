@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { Bot } from '../types';
 import BotCard from './BotCard';
 
@@ -10,8 +10,92 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ bots, onSelectBot, onEditBot, onDeleteBot }) => {
-  // Duplicate the bots array for a seamless infinite scroll effect
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const scrollerInnerRef = useRef<HTMLDivElement>(null);
+  
+  const positionRef = useRef(0);
+  const isDraggingRef = useRef(false);
+  const hasDraggedRef = useRef(false);
+  const startXRef = useRef(0);
+  const animationFrameIdRef = useRef<number | null>(null);
+
   const loopedBots = bots.length > 0 ? [...bots, ...bots] : [];
+
+  const handleSelectCard = useCallback((bot: Bot) => {
+    if (!hasDraggedRef.current) {
+      onSelectBot(bot);
+    }
+  }, [onSelectBot]);
+
+  useEffect(() => {
+    const scrollerInner = scrollerInnerRef.current;
+    if (!scrollerInner || bots.length === 0) return;
+
+    const scrollWidth = scrollerInner.scrollWidth / 2;
+
+    const autoScroll = () => {
+      if (!isDraggingRef.current) {
+        positionRef.current -= 0.5; // Scroll speed
+        if (positionRef.current <= -scrollWidth) {
+          positionRef.current += scrollWidth;
+        }
+        scrollerInner.style.transform = `translateX(${positionRef.current}px)`;
+      }
+      animationFrameIdRef.current = requestAnimationFrame(autoScroll);
+    };
+
+    autoScroll();
+
+    return () => {
+      if (animationFrameIdRef.current) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+    };
+  }, [bots.length]);
+
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    isDraggingRef.current = true;
+    hasDraggedRef.current = false;
+    const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
+    startXRef.current = pageX - positionRef.current;
+    if (scrollerInnerRef.current) {
+      scrollerInnerRef.current.style.cursor = 'grabbing';
+    }
+  }, []);
+  
+  const handleDragMove = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDraggingRef.current) return;
+    hasDraggedRef.current = true;
+    
+    const pageX = 'touches' in e ? e.touches[0].pageX : e.pageX;
+    const newPos = pageX - startXRef.current;
+    positionRef.current = newPos;
+
+    if (scrollerInnerRef.current) {
+      scrollerInnerRef.current.style.transform = `translateX(${newPos}px)`;
+    }
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    
+    if (scrollerInnerRef.current) {
+      scrollerInnerRef.current.style.cursor = 'grab';
+      const scrollWidth = scrollerInnerRef.current.scrollWidth / 2;
+      positionRef.current %= scrollWidth;
+       if (positionRef.current > 0) {
+          positionRef.current -= scrollWidth;
+       }
+       scrollerInnerRef.current.style.transition = 'transform 300ms ease-out';
+       scrollerInnerRef.current.style.transform = `translateX(${positionRef.current}px)`;
+       setTimeout(() => {
+         if (scrollerInnerRef.current) {
+           scrollerInnerRef.current.style.transition = '';
+         }
+       }, 300);
+    }
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col w-full overflow-hidden">
@@ -23,13 +107,23 @@ const HomePage: React.FC<HomePageProps> = ({ bots, onSelectBot, onEditBot, onDel
         </div>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <div className="scroller w-full" data-speed="slow">
-            <div className="scroller-inner">
+          <div 
+            ref={scrollerRef}
+            className="scroller w-full cursor-grab"
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+          >
+            <div ref={scrollerInnerRef} className="scroller-inner">
               {loopedBots.map((bot, index) => (
-                <div key={`${bot.id}-${index}`} className="w-[300px] md:w-[350px] mx-4">
+                <div key={`${bot.id}-${index}`} className="w-[300px] md:w-[350px] mx-4 select-none">
                   <BotCard 
                     bot={bot}
-                    onSelect={() => onSelectBot(bot)}
+                    onSelect={() => handleSelectCard(bot)}
                     onEdit={() => onEditBot(bot)}
                     onDelete={() => onDeleteBot(bot.id)}
                   />
